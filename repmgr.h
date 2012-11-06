@@ -1,6 +1,6 @@
 /*
  * repmgr.h
- * Copyright (c) 2ndQuadrant, 2010-2011
+ * Copyright (c) 2ndQuadrant, 2010-2012
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -69,9 +69,5 @@ typedef struct
 } t_runtime_options;
 
 #define SLEEP_MONITOR		2
-#define SLEEP_RETRY			3
-#define NUM_RETRY			40
-
-
 
 #endif

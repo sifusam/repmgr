@@ -1,6 +1,6 @@
 /*
  * repmgr.c - Command interpreter for the repmgr
- * Copyright (C) 2ndQuadrant, 2010-2011
+ * Copyright (C) 2ndQuadrant, 2010-2012
  *
  * This module is a command-line utility to easily setup a cluster of
  * hot standby servers for an HA environment
@@ -30,6 +30,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -269,7 +270,7 @@ main(int argc, char **argv)
 		break;
 	default:
 		log_err(_("%s: too many command-line arguments (first extra is \"%s\")\n"),
-		        progname, argv[optind + 1]);
+		        progname, argv[optind]);
 		usage();
 		exit(ERR_BAD_CONFIG);
 	}
@@ -1762,11 +1763,18 @@ test_ssh_connection(char *host, char *remote_user)
 	char script[MAXLEN];
 	int	 r;
 
+/* On some OS, true is located in a different place than in Linux */
+#ifdef __FreeBSD__
+#define TRUEBIN_PATH "/usr/bin/true"
+#else
+#define TRUEBIN_PATH "/bin/true"
+#endif
+
 	/* Check if we have ssh connectivity to host before trying to rsync */
 	if (!remote_user[0])
-		maxlen_snprintf(script, "ssh -o Batchmode=yes %s /bin/true", host);
+		maxlen_snprintf(script, "ssh -o Batchmode=yes %s %s", host, TRUEBIN_PATH);
 	else
-		maxlen_snprintf(script, "ssh -o Batchmode=yes %s -l %s /bin/true", host, remote_user);
+		maxlen_snprintf(script, "ssh -o Batchmode=yes %s -l %s %s", host, remote_user, TRUEBIN_PATH);
 
 	log_debug(_("command is: %s"), script);
 	r = system(script);

@@ -1,6 +1,6 @@
 /*
  * config.h
- * Copyright (c) 2ndQuadrant, 2010-2011
+ * Copyright (c) 2ndQuadrant, 2010-2012
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -37,6 +37,8 @@ typedef struct
 	char logfacility[MAXLEN];
 	char rsync_options[QUERY_STR_LEN];
 	int  master_response_timeout;
+	int  reconnect_attempts;
+	int  reconnect_intvl;
 } t_configuration_options;
 
 void parse_config(const char *config_file, t_configuration_options *options);

@@ -1,6 +1,6 @@
 /*
  * repmgrd.c - Replication manager daemon
- * Copyright (C) 2ndQuadrant, 2010-2011
+ * Copyright (C) 2ndQuadrant, 2010-2012
  *
  * This module connects to the nodes of a replication cluster and monitors
  * how far are they from master
@@ -32,8 +32,18 @@
 #include "strutil.h"
 #include "version.h"
 
+/* PostgreSQL's headers needed to export some functionality */
 #include "access/xlogdefs.h"
 #include "libpq/pqsignal.h"
+
+/* 
+ * we do not export InvalidXLogRecPtr so we need to define it 
+ * but since 9.3 it will be defined in xlogdefs.h which we include
+ * so better to ask if it's defined to be future proof
+ */
+#ifndef InvalidXLogRecPtr 
+const XLogRecPtr InvalidXLogRecPtr = {0, 0};
+#endif
 
 /*
  * Struct to keep info about the nodes, used in the voting process in
@@ -65,6 +75,7 @@ const char *progname;
 
 char	*config_file = DEFAULT_CONFIG_FILE;
 bool	verbose = false;
+bool	monitoring_history = false;
 char	repmgr_schema[MAXLEN];
 
 /*
@@ -113,6 +124,7 @@ main(int argc, char **argv)
 	{
 		{"config", required_argument, NULL, 'f'},
 		{"verbose", no_argument, NULL, 'v'},
+		{"monitoring-history", no_argument, NULL, 'm'},
 		{NULL, 0, NULL, 0}
 	};
 
@@ -137,7 +149,7 @@ main(int argc, char **argv)
 		}
 	}
 
-	while ((c = getopt_long(argc, argv, "f:v", long_options, &optindex)) != -1)
+	while ((c = getopt_long(argc, argv, "f:v:m", long_options, &optindex)) != -1)
 	{
 		switch (c)
 		{
@@ -146,6 +158,9 @@ main(int argc, char **argv)
 			break;
 		case 'v':
 			verbose = true;
+			break;
+		case 'm':
+			monitoring_history = true;
 			break;
 		default:
 			usage();
@@ -340,7 +355,7 @@ WitnessMonitor(void)
 	 * Check if the master is still available, if after 5 minutes of retries
 	 * we cannot reconnect, return false.
 	 */
-	CheckPrimaryConnection(); // this take up to NUM_RETRY * SLEEP_RETRY seconds
+	CheckPrimaryConnection(); // this take up to local_options.reconnect_attempts * local_options.reconnect_intvl seconds
 
 	if (PQstatus(primaryConn) != CONNECTION_OK)
 	{
@@ -351,6 +366,10 @@ WitnessMonitor(void)
 		PQfinish(myLocalConn);
 		exit(0);
 	}
+
+	/* Fast path for the case where no history is requested */
+	if (!monitoring_history)
+		return;
 
 	/*
 	 * Cancel any query that is still being executed,
@@ -420,7 +439,7 @@ StandbyMonitor(void)
 	 * Check if the master is still available, if after 5 minutes of retries
 	 * we cannot reconnect, try to get a new master.
 	 */
-	CheckPrimaryConnection(); // this take up to NUM_RETRY * SLEEP_RETRY seconds
+	CheckPrimaryConnection(); // this take up to local_options.reconnect_attempts * local_options.reconnect_intvl seconds
 
 	if (PQstatus(primaryConn) != CONNECTION_OK)
 	{
@@ -468,6 +487,10 @@ StandbyMonitor(void)
 		CloseConnections();
 		exit(ERR_PROMOTED);
 	}
+
+	/* Fast path for the case where no history is requested */
+	if (!monitoring_history)
+		return;
 
 	/*
 	 * Cancel any query that is still being executed,
@@ -569,7 +592,8 @@ do_failover(void)
 	 * which seems to be large enough for most scenarios
 	 */
 	nodeInfo nodes[50];
-	nodeInfo best_candidate;
+	/* initialize to keep compiler quiet */
+	nodeInfo best_candidate = {-1, InvalidXLogRecPtr, false };
 
 	/* first we get info about this node, and update shared memory */
 	sprintf(sqlquery, "SELECT pg_last_xlog_replay_location()");
@@ -595,11 +619,10 @@ do_failover(void)
 	/* get a list of standby nodes, including myself */
 	sprintf(sqlquery, "SELECT id, conninfo "
 	        "  FROM %s.repl_nodes "
-	        " WHERE id IN (SELECT standby_node FROM %s.repl_status) "
-			"   AND id <> %d "
+	        " WHERE id <> %d "
 	        "   AND cluster = '%s' "
 	        " ORDER BY priority ",
-	        repmgr_schema, repmgr_schema, primary_options.node, local_options.cluster_name);
+	        repmgr_schema, primary_options.node, local_options.cluster_name);
 
 	res1 = PQexec(myLocalConn, sqlquery);
 	if (PQresultStatus(res1) != PGRES_TUPLES_OK)
@@ -685,13 +708,13 @@ do_failover(void)
 			find_best = true;
 		}
 
-		/* we use the macros provided by xlogdefs.h to compare XLogPtr */
+		/* we use the macros provided by xlogdefs.h to compare XLogRecPtr */
 		/*
 		 * Nodes are retrieved ordered by priority, so if the current
-		 * best candidate is lower or equal to the next node's wal location
+		 * best candidate is lower than the next node's wal location
 		 * then assign next node as the new best candidate.
 		 */
-		if (XLByteLE(best_candidate.xlog_location, nodes[i].xlog_location))
+		if (XLByteLT(best_candidate.xlog_location, nodes[i].xlog_location))
 		{
 			best_candidate.nodeId                = nodes[i].nodeId;
 			best_candidate.xlog_location.xlogid  = nodes[i].xlog_location.xlogid;
@@ -749,17 +772,19 @@ CheckPrimaryConnection(void)
 
 	/*
 	 * Check if the master is still available
-	 * if after NUM_RETRY * SLEEP_RETRY seconds of retries
+	 * if after local_options.reconnect_attempts * local_options.reconnect_intvl seconds of retries
 	 * we cannot reconnect
 	 * return false
 	 */
-	for (connection_retries = 0; connection_retries < NUM_RETRY; connection_retries++)
+	for (connection_retries = 0; connection_retries < local_options.reconnect_attempts; connection_retries++)
 	{
 		if (!is_pgup(primaryConn, local_options.master_response_timeout))
 		{
-			log_warning(_("%s: Connection to master has been lost, trying to recover... %i seconds before failover decision\n"), progname, (SLEEP_RETRY*(NUM_RETRY-connection_retries)));
-			/* wait SLEEP_RETRY seconds between retries */
-			sleep(SLEEP_RETRY);
+			log_warning(_("%s: Connection to master has been lost, trying to recover... %i seconds before failover decision\n"), 
+								progname, 
+								(local_options.reconnect_intvl * (local_options.reconnect_attempts - connection_retries)));
+			/* wait local_options.reconnect_intvl seconds between retries */
+			sleep(local_options.reconnect_intvl);
 		}
 		else
 		{
@@ -912,6 +937,7 @@ void help(const char *progname)
 	printf(_("  --help                    show this help, then exit\n"));
 	printf(_("  --version                 output version information, then exit\n"));
 	printf(_("  --verbose                 output verbose activity information\n"));
+	printf(_("  --monitoring-history      track advance or lag of the replication in every standby in repl_monitor\n"));
 	printf(_("  -f, --config_file=PATH    configuration file\n"));
 	printf(_("\n%s monitors a cluster of servers.\n"), progname);
 }
