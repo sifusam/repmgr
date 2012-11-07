@@ -42,7 +42,6 @@ typedef struct
         char restore_command[MAXLEN];
         char archive_cleanup_command[MAXLEN];
         char recovery_end_command[MAXLEN];
-        char recovery_target_name[MAXLEN];
         char trigger_file[MAXLEN];
 } t_configuration_options;
 

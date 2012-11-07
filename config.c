@@ -44,7 +44,6 @@ parse_config(const char *config_file, t_configuration_options *options)
 	memset(options->restore_command, 0, sizeof(options->restore_command));
 	memset(options->archive_cleanup_command, 0, sizeof(options->archive_cleanup_command));
 	memset(options->recovery_end_command, 0, sizeof(options->recovery_end_command));
-	memset(options->recovery_target_name, 0, sizeof(options->recovery_target_name));
 	memset(options->trigger_file, 0, sizeof(options->trigger_file));
 
 	/* if nothing has been provided defaults to 60 */
@@ -122,8 +121,6 @@ parse_config(const char *config_file, t_configuration_options *options)
 			strncpy(options->archive_cleanup_command, value, MAXLEN);
 		else if (strcmp(name, "recovery_end_command") == 0)
 			strncpy(options->recovery_end_command, value, MAXLEN);
-		else if (strcmp(name, "recovery_target_command") == 0)
-			strncpy(options->recovery_target_command, value, MAXLEN);
 		else if (strcmp(name, "trigger_file") == 0)
 			strncpy(options->trigger_file, value, MAXLEN);
 		else
@@ -304,7 +301,6 @@ reload_configuration(char *config_file, t_configuration_options *orig_options)
         strcpy(orig_options->restore_command, new_options.restore_command);
         strcpy(orig_options->archive_cleanup_command, new_options.archive_cleanup_command);
         strcpy(orig_options->recovery_end_command, new_options.recovery_end_command);
-        strcpy(orig_options->recovery_target_name, new_options.recovery_target_name);
         strcpy(orig_options->trigger_file, new_options.trigger_file);
 	/*
 	 * XXX These ones can change with a simple SIGHUP?
