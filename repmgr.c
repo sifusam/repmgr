@@ -1751,6 +1751,46 @@ create_recovery_file(const char *data_dir)
 		return false;
 	}
 
+	maxlen_snprintf(line, options->restore_command);
+	if (fputs(line, recovery_file) == EOF)
+	{
+		log_err(_("recovery file could not be written, it could be necessary to create it manually\n"));
+		fclose(recovery_file);
+		return false;
+	}
+
+	maxlen_snprintf(line, options->archive_cleanup_command);
+	if (fputs(line, recovery_file) == EOF)
+	{
+		log_err(_("recovery file could not be written, it could be necessary to create it manually\n"));
+		fclose(recovery_file);
+		return false;
+	}
+
+	maxlen_snprintf(line, options->recovery_end_command);
+	if (fputs(line, recovery_file) == EOF)
+	{
+		log_err(_("recovery file could not be written, it could be necessary to create it manually\n"));
+		fclose(recovery_file);
+		return false;
+	}
+
+	maxlen_snprintf(line, options->recovery_target_name);
+	if (fputs(line, recovery_file) == EOF)
+	{
+		log_err(_("recovery file could not be written, it could be necessary to create it manually\n"));
+		fclose(recovery_file);
+		return false;
+	}
+
+	maxlen_snprintf(line, options->trigger_file);
+	if (fputs(line, recovery_file) == EOF)
+	{
+		log_err(_("recovery file could not be written, it could be necessary to create it manually\n"));
+		fclose(recovery_file);
+		return false;
+	}
+
 	/*FreeFile(recovery_file);*/
 	fclose(recovery_file);
 

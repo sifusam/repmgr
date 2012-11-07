@@ -39,6 +39,11 @@ typedef struct
 	int  master_response_timeout;
 	int  reconnect_attempts;
 	int  reconnect_intvl;
+        char restore_command[MAXLEN];
+        char archive_cleanup_command[MAXLEN];
+        char recovery_end_command[MAXLEN];
+        char recovery_target_name[MAXLEN];
+        char trigger_file[MAXLEN];
 } t_configuration_options;
 
 void parse_config(const char *config_file, t_configuration_options *options);

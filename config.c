@@ -41,6 +41,11 @@ parse_config(const char *config_file, t_configuration_options *options)
 	memset(options->promote_command, 0, sizeof(options->promote_command));
 	memset(options->follow_command, 0, sizeof(options->follow_command));
 	memset(options->rsync_options, 0, sizeof(options->rsync_options));
+	memset(options->restore_command, 0, sizeof(options->restore_command));
+	memset(options->archive_cleanup_command, 0, sizeof(options->archive_cleanup_command));
+	memset(options->recovery_end_command, 0, sizeof(options->recovery_end_command));
+	memset(options->recovery_target_name, 0, sizeof(options->recovery_target_name));
+	memset(options->trigger_file, 0, sizeof(options->trigger_file));
 
 	/* if nothing has been provided defaults to 60 */
 	options->master_response_timeout = 60;
@@ -111,6 +116,16 @@ parse_config(const char *config_file, t_configuration_options *options)
 			options->reconnect_attempts = atoi(value);
 		else if (strcmp(name, "reconnect_interval") == 0)
 			options->reconnect_intvl = atoi(value);
+		else if (strcmp(name, "restore_command") == 0)
+			strncpy(options->restore_command, value, MAXLEN);
+		else if (strcmp(name, "archive_cleanup_command") == 0)
+			strncpy(options->archive_cleanup_command, value, MAXLEN);
+		else if (strcmp(name, "recovery_end_command") == 0)
+			strncpy(options->recovery_end_command, value, MAXLEN);
+		else if (strcmp(name, "recovery_target_command") == 0)
+			strncpy(options->recovery_target_command, value, MAXLEN);
+		else if (strcmp(name, "trigger_file") == 0)
+			strncpy(options->trigger_file, value, MAXLEN);
 		else
 			log_warning(_("%s/%s: Unknown name/value pair!\n"), name, value);
 	}
@@ -286,6 +301,11 @@ reload_configuration(char *config_file, t_configuration_options *orig_options)
 	orig_options->master_response_timeout = new_options.master_response_timeout;
 	orig_options->reconnect_attempts = new_options.reconnect_attempts;
 	orig_options->reconnect_intvl = new_options.reconnect_intvl;
+        strcpy(orig_options->restore_command, new_options.restore_command);
+        strcpy(orig_options->archive_cleanup_command, new_options.archive_cleanup_command);
+        strcpy(orig_options->recovery_end_command, new_options.recovery_end_command);
+        strcpy(orig_options->recovery_target_name, new_options.recovery_target_name);
+        strcpy(orig_options->trigger_file, new_options.trigger_file);
 	/*
 	 * XXX These ones can change with a simple SIGHUP?
 

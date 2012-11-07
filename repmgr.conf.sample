@@ -33,3 +33,19 @@ loglevel=NOTICE
 # Logging facility: possible values are STDERR or - for Syslog integration - one of LOCAL0, LOCAL1, ..., LOCAL7, USER
 # Default: STDERR
 logfacility=STDERR
+
+# Restore Command: The shell command to execute to retrieve an archived segment of the WAL file series.
+# Default: none
+restore_command='cp /mnt/server/archivedir/%f "%p"'
+
+# Archive Cleanup Command: Shell command that will be executed at every restartpoint.
+# Default: none
+archive_cleanup_command='pg_archivecleanup /mnt/server/archivedir %r'
+
+# Recovery End Command: Shell command that will be executed once only at the end of recovery.
+# Default: none
+recovery_end_command='mail -s "Recovery End Complete - Check pg_log for details." dba'
+
+# Trigger File: Specifies a trigger file whose presence ends recovery in the standby.
+# Default none
+trigger_file='/path_to/trigger'
